@@ -10,9 +10,12 @@ rm(list=ls()) # Clear the current environment
 #############################################
 library(tidyverse)
 library(ggthemes) 
-library(rgdal)
 library(ggplot2)
+library(sf)
+library(sp) # library(rgdal)
 library(rworldmap)
+library(rnaturalearth)
+library(rnaturalearthdata)
 library(cleangeo)
 library(gridExtra)
 library(ggpubr)
@@ -21,17 +24,11 @@ library(RColorBrewer)
 library(patchwork)  
 
 #############################################
-#              LOAD FUNCTIONS               #
-#############################################
-source("R/shp_to_df.R" ) # These scripts were created by Rachel Steenson 31/01/2020
-source("R/create_discrete_scale_for_GLUE.R")
-
-#############################################
 #                IMPORT DATA                #
 #############################################
 # Currently you use two different files - but it should be easy to just use the SAME file
-SR <- read.csv(file = "Data/data_ready_for_figures/Global_distribution_fig2b.csv") # data is from Gurdeep's systematic review 19/10/20
-TS <- read.csv("Data/data_ready_for_figures/Fig_2a_Time_series_globally.csv")
+SR <- read.csv(file = "Data/Global_distribution_fig2b.csv") # data is from Gurdeep's systematic review 19/10/20
+TS <- read.csv("Data/Fig_2a_Time_series_globally.csv")
 
 dim(TS); dim(SR)
 TS2 <- SR %>% 
@@ -41,16 +38,24 @@ dim(TS); dim(TS2) # Check if timeseries data (unique papers listed by country ma
 
 # Download world map
 world_map <- getMap() # plot(world_map)
+world <- ne_countries(returnclass = "sf") 
+world <- ne_countries(scale = "medium", returnclass = "sf") 
+
+ggplot(data = world) +
+  geom_sf() 
 
 #############################################
 #              CLEANING DATA                #
 #############################################
 # Find which country names do not match between data and map file
 map_countries <- as.character(world_map$ADMIN)
+map_countries2 <- as.character(world$admin)
+
 systematic_countries <- unique(SR$Country)
 no_match <- setdiff(systematic_countries, map_countries); message(length(no_match), " countries are mis-matched: \n", paste0(no_match, collapse="\n"))
+no_match <- setdiff(systematic_countries, map_countries2); message(length(no_match), " countries are mis-matched: \n", paste0(no_match, collapse="\n"))
 # Fixing mis-matched countries 
-SR$Country[grepl("West Indies", SR$Country)] <- "West Indies" # The West Indes are NOT a country! so this has not worked
+SR$Country[grepl("West Indies", SR$Country)] <- "Dominican Republic" # The West Indes are NOT a country! so this has not worked - introduced Dominican republic instead
 
 # How many entries are there for the remaining mis-matches?
 table(SR$Country[which(SR$Country %in% no_match)])
@@ -96,11 +101,9 @@ systematic_global <- rbind(systematic_africa, systematic_asia, systematic_americ
 # world_map_data_df <- shp_to_df(world_map_data) # Transform the spatialPolygonsDataframe to a dataframe, with coordinates stored in the df
 
 # Join with world map
-world_map <- clgeo_Clean(world_map) # Clean shapefile - if you run the shp_to_df function without this, you get an error (not normally required!)
-world_map_data <- merge(world_map, systematic_global, by.x="ADMIN", by.y="Country") # Merge summary data with world map
-world_map_data[is.na(world_map_data$n)] <- 0 # did we need to use factors for countries!
-table(world_map_data$n, useNA="always") # Set number of sequences==NA as 0
-world_map_data_df <- shp_to_df(world_map_data) # Transform the spatialPolygonsDataframe to a dataframe, with coordinates stored in the df
+world_map <- merge(world, systematic_global, by.x="admin", by.y="Country", all = T) # Merge summary data with world map
+world_map$n[is.na(world_map$n)] <- 0 
+table(world_map$n, useNA="always") # Set number of sequences==NA as 0
 
 # world_map_asia <- merge(world_map, systematic_asia, by.x="ADMIN", by.y="Country") # Merge summary data with world map
 # world_map_asia[is.na(world_map_asia$n)] <- 0 # did we need to use factors for countries!
@@ -118,15 +121,20 @@ world_map_data_df <- shp_to_df(world_map_data) # Transform the spatialPolygonsDa
 #############################################
 br <- c(0,1,2,6,11,100)
 col_length <- length(br)
-summary(world_map_data_df$n)
-df_catscale <- create_discrete_scale_for_GLUE(dataframe = world_map_data_df, n_col="n", breaks=br)
+summary(world_map$n)
 
-df_catscale$global_scale <-  df_catscale$n
-df_catscale$global_scale[which(df_catscale$n == 0)] <-  0
-df_catscale$global_scale[which(df_catscale$cat_scale == "1-2")] <-  1
-df_catscale$global_scale[which(df_catscale$cat_scale == "2-6")] <-  5
-df_catscale$global_scale[which(df_catscale$cat_scale == "6-11")] <-  10
-df_catscale$global_scale[which(df_catscale$cat_scale == "11-100")] <-  50
+catscale <- cut(world_map$n, breaks = br,
+                  labels = c("0", "1-2", "2-6", "6-11", "11-100"), right = FALSE)
+world_map$cat_scale <- as.character(catscale)
+world_map$global_scale <- as.character(catscale)
+world_map$global_scale[which(world_map$n == 0)] <-  0
+world_map$global_scale[which(world_map$cat_scale == "1-2")] <-  1
+world_map$global_scale[which(world_map$cat_scale == "2-6")] <-  5
+world_map$global_scale[which(world_map$cat_scale == "6-11")] <-  10
+world_map$global_scale[which(world_map$cat_scale == "11-100")] <-  50
+world_map$global_scale <- as.numeric(world_map$global_scale )
+df_catscale <- world_map
+
 
 df_catscale$global_scale[which(df_catscale$Region == "Asia")] <-  df_catscale$global_scale[which(df_catscale$Region == "Asia")]*100
 df_catscale$global_scale[which(df_catscale$Region == "Americas")] <-  df_catscale$global_scale[which(df_catscale$Region == "Americas")]*10000
@@ -145,14 +153,16 @@ cols_global <- c("white", colsAf, colsAs, colsAm)
 
 # Set the breaks appropriately and use the function to create a colour scale
 # Plot the map including the data and a colour scale indicating the number of papers, and give it a title
-systematic_map<-ggplot() +
-  geom_polygon(data = df_catscale, aes(x=long, y=lat, group=group, fill=global_scale), col="black") +
+systematic_map <-
+  ggplot(data = world) +
+  geom_sf(data=world, fill="white")+
+  geom_sf(data=df_catscale, aes(fill = global_scale), inherit.aes = FALSE) +
   scale_fill_manual(name="Papers", values=cols_global, 
                     labels = c("0","1","2-5","6-10",">10", "1","2-5","6-10",">10", "1","2-5","6-10",">10")) +
   theme_void() +
   coord_equal() +
   geom_text(label = "B", x = 2002, y = 20) +
- # lims(x = c(-170, 180), y = c(-60,90)) +
+  # lims(x = c(-170, 180), y = c(-60,90)) +
   coord_sf(xlim = c(-110, 140), ylim = c(-52, 75), expand = T) +
   theme(axis.text.x = element_blank(),
         axis.text.y = element_blank(),
@@ -161,6 +171,7 @@ systematic_map<-ggplot() +
         axis.title.x=element_blank()) + 
   ggtitle("B")
 systematic_map
+
 
 # # zoom in on a map we need to set the xy limits of the plot
 # Afrasia <- bbox(world_map_data[which(world_map_data$continent=="Africa","Asia"),])# bounding box for the continent of Africa
@@ -203,8 +214,6 @@ publication_TS <- ggplot(TS_region, aes(x=Year_of_publication, y=n, fill = Regio
   theme
 publication_TS
 
-
-
 # Save the plots
 ggsave("Figures/fig2_ts_map.pdf", 
        plot = publication_TS / systematic_map + plot_layout(heights=c(1,1.8)), 
@@ -216,5 +225,6 @@ ggsave("Figures/fig2_ts_map.pdf",
 # # Arrange the combined plot
 # fig2 <- grid.arrange(arrangeGrob(publication_TS, systematic_map, nrow=2))
 # ggsave(plot = fig2, path = "Figures", filename = "Fig2_combined.pdf", width = 16, height = 16, units = "cm")
+
 
 
