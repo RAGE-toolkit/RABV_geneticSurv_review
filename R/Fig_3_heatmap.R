@@ -70,7 +70,7 @@ colnames(df) <- c("x", "y", "value")
 
 am_hm  <- ggplot(df, aes(x = y, y = x, fill = value)) + 
   geom_tile() +
-  xlab("") + ylab("Country") + ggtitle("Americas") +
+  xlab("") + ylab("Country") + ggtitle("A. Americas") +
   scale_fill_continuous(breaks=seq(0,60, by=10),low='white',high=colsAm, name="Studies") +
   theme(axis.text.x=element_text(angle=45,hjust=1))
 am_hm
@@ -83,7 +83,7 @@ colnames(df) <- c("x", "y", "value")
 
 af_hm  <- ggplot(df, aes(x = y, y = x, fill = value)) + 
   geom_tile() +
-  xlab("") + ylab("") + ggtitle("Africa") +
+  xlab("") + ylab("") + ggtitle("B. Africa") +
   scale_fill_continuous(breaks=seq(0,60, by=10),low='white',high=colsAf, name="Studies") +
   theme(axis.text.x=element_text(angle=45,hjust=1))
 af_hm
@@ -96,7 +96,7 @@ colnames(df) <- c("x", "y", "value")
 
 as_hm  <- ggplot(df, aes(x = y, y = x, fill = value)) + 
   geom_tile() +
-  xlab("") + ylab("") + ggtitle("Asia") +
+  xlab("") + ylab("") + ggtitle("C. Asia") +
   scale_fill_continuous(breaks=seq(0,55, by=10),low='white',high=colsAs, name = "Studies") +
   theme(axis.text.x=element_text(angle=45,hjust=1))
 as_hm
