@@ -168,6 +168,9 @@ sorted_clade_cols <- sort(c(colnames(metadata)[clade_cols]))
 
 ## add scatterpies on top of shaded map
 
+## currently a problem with ordering the clade legend while maintaining correct colour associations so current version produces an un-alphatised clade legend, which is not ideal!
+## have tried many "fixes" but none currently working
+
 plot_world2<-plot_world + 
   new_scale("fill")+
   scale_fill_manual(name = "Phylogenetic Clade (Major_Minor)", values = set_pal) +
