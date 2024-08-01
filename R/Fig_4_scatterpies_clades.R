@@ -20,6 +20,8 @@ library(ggpubr)
 library(ggnewscale)
 library(dplyr)
 library(patchwork)   
+library(RColorBrewer)
+library(pals)
 
 #############################################
 #                IMPORT DATA                #
@@ -32,6 +34,20 @@ names(metadata)[1]="country"
 names(metadata)=gsub("."," ", names(metadata), fixed=T)
 # change name of RABV clade to Unclassified
 names(metadata)[grep("RABV",names(metadata))]="Unclassified"
+# reorder cols to alphabetical
+# indicate which columns are the clade data
+clade_cols <-which(grepl("cosmo|asian|arctic|indian|africa|unclassified", colnames(metadata),ignore.case = TRUE))
+continue=max(clade_cols)+1
+# sort
+sorted_col_names <- sort(names(metadata)[clade_cols])
+# custom order
+sorted_col_names2 <-sorted_col_names [c(3:18,1:2,19:35)]
+# Reorder the dataframe with columns 1 to 3, the sorted columns, and then the remaining columns
+metadata_reordered <- metadata[, c(names(metadata)[1:3], sorted_col_names2, names(metadata)[continue:ncol(metadata)])]
+
+# Check the reordered dataframe
+names(metadata_reordered)
+
 
 
 #############################################
@@ -122,6 +138,7 @@ metadata$LON[which(metadata$country=="Sudan")]=world_points$X[world_points$name=
 metadata$LAT[which(metadata$country=="Sudan")]=world_points$Y[world_points$name=="Sudan"]
 metadata$LON[which(metadata$country=="Russia")]=world_points$X[world_points$name=="Russia"]
 metadata$LAT[which(metadata$country=="Russia")]=55 #world_points$Y[world_points$name=="Russia"]
+metadata$LON[which(metadata$country=="South Africa")]=24
 world_points$X[world_points$name=="South Africa"]=metadata$LON[which(metadata$country=="South Africa")]
 world_points$Y[world_points$name=="South Africa"]=metadata$LAT[which(metadata$country=="South Africa")]
 
@@ -148,34 +165,26 @@ plot_world<-
 plot_world
 
 ## colours for lots of data
-#n <- 50
-#qual_col_pals = brewer.pal.info[brewer.pal.info$category == 'qual',]
-#col_vector = unlist(mapply(brewer.pal, qual_col_pals$maxcolors, rownames(qual_col_pals)))
-## have to manually set the palette based on the above code so as to be able to remove the grey colours
-set_pal=c( "#7FC97F" ,"#FDC086" ,"#FFFF99" ,"#F0027F" ,"#BF5B17" ,"#1B9E77" ,"#D95F02"  ,"#E7298A" ,"#66A61E", "#E6AB02","#A6761D" ,"#1F78B4" ,"#B2DF8A" ,"#33A02C" ,"#FB9A99" ,"#E31A1C" ,"#FDBF6F" ,"#FF7F00" ,"#CAB2D6" ,"#6A3D9A" ,"#FFFF99" ,"#B15928", "#FBB4AE" ,"#B3CDE3" ,"#CCEBC5" ,"#DECBE4" ,"#FED9A6" ,"#FFFFCC" ,"#E5D8BD" ,"#FDDAEC" ,"#B3E2CD" ,"#FDCDAC" ,"#CBD5E8" ,"#F4CAE4" ,"#E6F5C9", "#FFF2AE" ,"#F1E2CC" ,"#E41A1C" ,"#377EB8" ,"#4DAF4A", "#984EA3" ,"#FF7F00" ,"#FFFF33" ,"#A65628" ,"#F781BF" ,"#66C2A5" ,"#FC8D62", "#8DA0CB" ,"#E78AC3" ,"#A6D854" ,"#FFD92F", "#E5C494" ,"#8DD3C7" ,"#FFFFB3" ,"#BEBADA" ,"#FB8072" ,"#80B1D3" ,"#FDB462" ,"#B3DE69" ,"#FCCDE5", "#BC80BD" ,"#CCEBC5" ,"#FFED6F")
-pie(rep(1,length(set_pal)), col=sample(set_pal, length(set_pal)))
-#names(set_pal) <- sort(c(colnames(metadata)[clade_cols]))
-#colScale <- scale_fill_manual(name = "grp",values = set_pal)
-#,label=sort(c(colnames(metadata)[clade_cols])))
+n <- 35
+col_vector=polychrome(36)[-1]
+pie(rep(1, n), col=col_vector)
+names(col_vector) <- sorted_col_names2
+col_vector[names(col_vector)=="Unclassified"]="white"
+
+
+colScale <- scale_fill_manual(name = "Phylogenetic Clade (Major_Minor)",values = col_vector,label=sorted_col_names2, breaks=sorted_col_names2 )
 
 
 # add country names for reference on map
 name_country <- c("Brazil", "Mexico", "China", "Indonesia", "South Africa", "Kenya", "Iran", "India", "Argentina", "Russia", "Niger", "Puerto Rico", "Sri Lanka")
 
-# indicate which columns are the clade data
-clade_cols <-which(grepl("cosmo|asian|arctic|indian|africa|unclassified", colnames(metadata),ignore.case = TRUE))
-sorted_clade_cols <- sort(c(colnames(metadata)[clade_cols]))
-
 ## add scatterpies on top of shaded map
-
-## currently a problem with ordering the clade legend while maintaining correct colour associations so current version produces an un-alphatised clade legend, which is not ideal!
-## have tried many "fixes" but none currently working
-
 plot_world2<-plot_world + 
   new_scale("fill")+
-  scale_fill_manual(name = "Phylogenetic Clade (Major_Minor)", values = set_pal) +
- geom_scatterpie(aes(x=LON, y=LAT,group=region, r=(radius+0.1)), data=metadata, cols=sorted_clade_cols, fill="darkblue",color=NA, alpha=1)+
-  geom_scatterpie(aes(x=LON, y=LAT, group=region, r=radius), data=metadata, cols=sorted_clade_cols, color=NA, alpha=0.8,sorted_by_radius = T)+
+ geom_scatterpie(aes(x=LON, y=LAT,group=region, r=(radius+0.1)), data=metadata, cols=sorted_col_names2, fill="darkblue",color=NA, alpha=1)+
+  new_scale_fill()+
+  geom_scatterpie(aes(x=LON, y=LAT, group=region, r=radius), data=metadata, cols=sorted_col_names2, color=NA, alpha=1,sorted_by_radius = T)+
+  colScale+
   geom_text(data=subset(world2, name %in% name_country),aes(x=X, y=Y, label=name),color = "darkblue", fontface = "bold", check_overlap = F, size=3, nudge_y = -1.5)+
   geom_text(data=subset(world2, name=="China"),aes(x=X, y=Y, label=name),color = "lightsteelblue1", fontface = "bold", check_overlap = TRUE, size=3, nudge_y = -1.5)+
  coord_sf(xlim = c(-106, 140), ylim = c(-52, 55 ), expand = T)+
@@ -184,7 +193,7 @@ plot_world2<-plot_world +
 plot_world2
 
 # can edit geom_scatterpie_legend function to improve aesthetics. This is a manual thing:
-## uncomment and paste this into lines 37:43to implement same (in pop up box in next line of code):
+# uncomment and paste this into lines 37:43to implement same (in pop up box in next line of code):
 # list(geom_arc_bar(aes_(x0 = ~x, y0 = ~y, r0 = ~r, r = ~r,
 # start = ~start, end = ~end), color="darkblue",linewidth=0.1,data = dd, inherit.aes = FALSE),
 # geom_segment(aes_(x = ~x, xend = ~sign(x, maxr * 1.5),
